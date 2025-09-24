@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: lab02/frontend
+    container_name: lab02_frontend
+    env_file: .env
+    environment:
+      - CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING}
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host --port 5173"
+    networks:
+      - labnet
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: lab02/backend
+    container_name: lab02_backend
+    env_file: .env
+    environment:
+      - CHOKIDAR_USEPOLLING=${CHOKIDAR_USEPOLLING}
+      - WATCHPACK_POLLING=${WATCHPACK_POLLING}
+      - PORT=3000
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${POSTGRES_USER}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_NAME=${POSTGRES_DB}
+    ports:
+      - "${BACKEND_PORT}:3000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run start:dev"
+    networks:
+      - labnet
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:alpine
+    container_name: lab02_postgres
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "${PG_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - labnet
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: lab02_pgadmin
+    env_file: .env
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - labnet
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: lab02/nginx
+    container_name: lab02_nginx
+    env_file: .env
+    ports:
+      - "${NGINX_PORT}:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - labnet
+
+networks:
+  labnet:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  frontend_node_modules:
+  backend_node_modules:
